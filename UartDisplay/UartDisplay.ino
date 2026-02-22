@@ -11,6 +11,9 @@ static int lineHead = 0;      // next write position
 static int storedLines = 0;   // number of complete lines stored
 static String currentLine;    // line currently being received
 
+// PORT80 tracking
+static String lastPort80;
+
 // Scroll state
 static int linesPerScreen = 0;
 static int charsPerLine = 0;
@@ -20,6 +23,13 @@ static int viewOffset = 0;    // 0 = showing latest, >0 = scrolled up
 
 static void addCompleteLine(const String& line)
 {
+  // Extract PORT80 code if present
+  int idx = line.indexOf("PORT80: ");
+  if (idx >= 0) {
+    lastPort80 = line.substring(idx + 8);
+    lastPort80.trim();
+  }
+
   lines[lineHead] = line;
   lineHead = (lineHead + 1) % MAX_LINES;
   if (storedLines < MAX_LINES) storedLines++;
@@ -57,6 +67,21 @@ static void renderScreen()
     canvas.setTextColor(TFT_BLACK, TFT_ORANGE);
     canvas.setCursor(w - 12, 0);
     canvas.print("||");
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+  }
+
+  // PORT80 badge in bottom-right corner
+  if (lastPort80.length() > 0) {
+    int w = canvas.width();
+    int h = canvas.height();
+    int textW = lastPort80.length() * canvas.textWidth("A");
+    int pad = 2;
+    int boxW = textW + pad * 2;
+    int boxH = fontH + pad * 2;
+    canvas.fillRect(w - boxW, h - boxH, boxW, boxH, TFT_BLUE);
+    canvas.setTextColor(TFT_WHITE, TFT_BLUE);
+    canvas.setCursor(w - boxW + pad, h - boxH + pad);
+    canvas.print(lastPort80);
     canvas.setTextColor(TFT_WHITE, TFT_BLACK);
   }
 
