@@ -17,16 +17,17 @@ arduino-cli lib install M5Unified
 Building
 
 ```
-arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries /home/zoid/clone/m5stack/ButtonExample
+arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries ButtonExample
+arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries UartDisplay
 
 # With local library
-arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries --library ./M5Unified --library ./M5GFX /home/zoid/clone/m5stack/ButtonExample
-
-esptool --chip esp32 --port /dev/ttyUSB0 --baud 115200 write-flash 0x0 /home/zoid/clone/m5stack/ButtonExample/build/esp32.esp32.esp32/ButtonExample.ino.merged.bin
+arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries --library ./M5Unified --library ./M5GFX ButtonExample
 ```
 
 Flashing
 
 ```
 arduino-cli board list
+esptool --chip esp32 --port /dev/ttyUSB0 --baud 115200 write-flash 0x0 ButtonExample/build/esp32.esp32.esp32/ButtonExample.ino.merged.bin
+esptool --chip esp32 --port /dev/ttyUSB0 --baud 115200 write-flash 0x0 UartDisplay/build/esp32.esp32.esp32/UartDisplay.ino.merged.bin
 ```
