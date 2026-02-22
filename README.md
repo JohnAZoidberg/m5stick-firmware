@@ -24,6 +24,15 @@ arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries UartDisplay
 arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries --library ./M5Unified --library ./M5GFX ButtonExample
 ```
 
+## UartDisplay
+
+Scrolling UART console for M5StickC Plus. Reads text from a serial device connected to the HAT pins (RX=G26, TX=G0) at 115200 baud and displays it on screen as a scrolling log.
+
+- Auto-rotate: Landscape orientation that flips 180 degrees based on IMU, with a 45-degree deadzone to prevent wobble when held flat.
+- Scroll control: BtnA (front) pauses/resumes auto-scroll. When paused, BtnB and BtnPWR (side buttons) scroll up/down one line. Button mapping swaps with screen rotation so top always scrolls up. Resuming jumps back to the latest output.
+- Line wrapping: Long lines without newlines are automatically wrapped at screen width.
+- PORT80 badge: Lines matching `PORT80: XXXX` are parsed and the latest hex code is shown as a white-on-blue badge in the bottom-right corner.
+
 Flashing
 
 ```
