@@ -135,7 +135,8 @@ void loop(void)
       addCompleteLine(currentLine);
       currentLine = "";
       dirty = true;
-    } else if (c != '\r') {
+    } else if (c >= ' ' && c <= '~') {
+      // Filter only printable ASCII characters (0x20–0x7E)
       currentLine += c;
       if ((int)currentLine.length() >= charsPerLine) {
         addCompleteLine(currentLine);
