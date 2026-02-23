@@ -366,8 +366,8 @@ void loop(void)
     }
   }
 
-  // Power off after 1 minute of no UART activity
-  if (millis() - lastUartRx >= IDLE_TIMEOUT_MS) {
+  // Power off after 1 minute of no UART activity (but not if paused)
+  if (autoScroll && millis() - lastUartRx >= IDLE_TIMEOUT_MS) {
     M5.Display.clear();
     M5.Display.setCursor(0, 0);
     M5.Display.print("No UART — powering off");
