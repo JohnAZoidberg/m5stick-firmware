@@ -23,16 +23,103 @@ static int fontH = 0;
 static bool autoScroll = true;
 static int viewOffset = 0;    // 0 = showing latest, >0 = scrolled up
 
+// ANSI escape sequence parsing state
+static bool inEscape = false;     // currently inside ESC sequence
+static bool inCSI = false;        // inside CSI (ESC [) sequence
+static char csiCmd = 0;           // stores CSI command letter for interpretation
+
+// Check if character is a CSI final byte (cursor/erase commands)
+static bool isCSIFinalByte(char c)
+{
+  // Common CSI final bytes: A(up) B(down) C(forward) D(back) J(erase) K(erase line) H(position)
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
+// Clean up line by removing prompts and broken escape sequences
+static String cleanLine(const String& line)
+{
+  String s = line;
+
+  // Remove EC prompt (may appear multiple times due to corruption)
+  while (s.indexOf("ec:~> ") >= 0) {
+    s.replace("ec:~> ", "");
+  }
+  while (s.indexOf("ec:~>") >= 0) {
+    s.replace("ec:~>", "");
+  }
+
+  // Remove broken escape sequences (ESC byte lost, left with [nX patterns)
+  // Common: [6D [7D [J [1A [nC etc.
+  int i = 0;
+  String clean;
+  while (i < (int)s.length()) {
+    // Check for stray CSI final byte followed by [ (from split sequences like "D[J...")
+    // But preserve "![" as it's a valid message prefix
+    if (i == 0 && isCSIFinalByte(s[i]) && i + 1 < (int)s.length() && s[i + 1] == '[') {
+      i++;  // Skip the stray final byte
+      continue;
+    }
+
+    // Check for broken CSI sequence starting with [
+    if (s[i] == '[' && i + 1 < (int)s.length()) {
+      int j = i + 1;
+      // Skip digits and semicolons (CSI parameters)
+      while (j < (int)s.length() && ((s[j] >= '0' && s[j] <= '9') || s[j] == ';')) {
+        j++;
+      }
+      if (j >= (int)s.length()) {
+        // Incomplete sequence at end of string (e.g., "[6") - remove it
+        i = j;
+        continue;
+      }
+      char finalChar = s[j];
+
+      // [digits. = timestamp like [56752.021700...], keep it
+      if (finalChar == '.') {
+        clean += s[i];
+        i++;
+        continue;
+      }
+
+      // [digits letter = broken CSI (e.g., [6D, [J, [1A), remove it
+      if (isCSIFinalByte(finalChar)) {
+        i = j + 1;
+        continue;
+      }
+
+      // [digits then other garbage (e.g., "[55984+") - remove [digits portion
+      if (j > i + 1) {
+        i = j;
+        continue;
+      }
+    }
+    clean += s[i];
+    i++;
+  }
+
+  // Remove stray CSI final bytes that appear after cleanup
+  // Pattern: single letter at start followed by [digit (from split [6D sequences)
+  while (clean.length() >= 2 && isCSIFinalByte(clean[0]) && clean[1] == '[') {
+    clean = clean.substring(1);
+  }
+
+  clean.trim();
+  return clean;
+}
+
 static void addCompleteLine(const String& line)
 {
+  String cleaned = cleanLine(line);
+  if (cleaned.length() == 0) return;  // skip empty lines
+
   // Extract PORT80 code if present
-  int idx = line.indexOf("PORT80: ");
+  int idx = cleaned.indexOf("PORT80: ");
   if (idx >= 0) {
-    lastPort80 = line.substring(idx + 8);
+    lastPort80 = cleaned.substring(idx + 8);
     lastPort80.trim();
   }
 
-  lines[lineHead] = line;
+  lines[lineHead] = cleaned;
   lineHead = (lineHead + 1) % MAX_LINES;
   if (storedLines < MAX_LINES) storedLines++;
   if (!autoScroll) viewOffset++;
@@ -100,7 +187,6 @@ void setup(void)
 {
   M5.begin();
   M5.BtnPWR.setHoldThresh(1024);
-  Serial.begin(115200);
 
   // HAT UART: RX=G26, TX=G0 (4 KiB RX buffer to avoid drops during rendering)
   Serial2.begin(115200, SERIAL_8N1, 26, 0, false, 4096);
@@ -129,15 +215,54 @@ void loop(void)
 {
   M5.update();
 
-  // Read UART data into buffer
+  // Read UART data into buffer, stripping ANSI escape sequences
   bool dirty = false;
   while (Serial2.available()) {
     lastUartRx = millis();
     char c = Serial2.read();
-    Serial.print(c); // echo to USB serial for debug
+
+    // ANSI escape sequence state machine
+    if (inEscape) {
+      if (inCSI) {
+        // Inside CSI sequence: wait for final byte (0x40-0x7E)
+        if (c >= 0x40 && c <= 0x7E) {
+          csiCmd = c;
+          inEscape = false;
+          inCSI = false;
+          // Interpret [J (erase display/line) as "new message"
+          // EC pattern: ec:~> [6D[J[message]
+          // Commit current content (cleanup happens in addCompleteLine)
+          if (csiCmd == 'J') {
+            if (currentLine.length() > 0) {
+              addCompleteLine(currentLine);
+              dirty = true;
+            }
+            currentLine = "";
+          }
+        }
+        // Otherwise keep consuming CSI parameter bytes
+      } else {
+        // Just saw ESC, check for CSI introducer '['
+        if (c == '[') {
+          inCSI = true;
+        } else {
+          // Non-CSI escape (e.g., ESC followed by single char)
+          inEscape = false;
+        }
+      }
+      continue;
+    }
+
+    // Start of escape sequence
+    if (c == '\x1b') {
+      inEscape = true;
+      inCSI = false;
+      continue;
+    }
+
+    // Normal character handling
     if (c == '\n' || c == '\r') {
       if (currentLine.length() > 0) {
-        currentLine.replace("ec:~> ", "");
         addCompleteLine(currentLine);
         currentLine = "";
       }
