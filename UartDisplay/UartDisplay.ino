@@ -3,6 +3,8 @@
 static M5Canvas canvas(&M5.Display);
 static uint8_t currentRotation = 3;
 static unsigned long lastImuCheck = 0;
+static unsigned long lastUartRx = 0;
+static const unsigned long IDLE_TIMEOUT_MS = 60000;
 
 // Line buffer (circular)
 static const int MAX_LINES = 200;
@@ -117,6 +119,7 @@ void setup(void)
   linesPerScreen = h / fontH;
   charsPerLine = w / canvas.textWidth("A");
 
+  lastUartRx = millis();
   addCompleteLine("UART Display ready");
   addCompleteLine("115200 8N1 RX=G26 TX=G0");
   renderScreen();
@@ -129,6 +132,7 @@ void loop(void)
   // Read UART data into buffer
   bool dirty = false;
   while (Serial2.available()) {
+    lastUartRx = millis();
     char c = Serial2.read();
     Serial.print(c); // echo to USB serial for debug
     if (c == '\n') {
@@ -199,6 +203,15 @@ void loop(void)
       M5.Display.setRotation(currentRotation);
       renderScreen();
     }
+  }
+
+  // Power off after 1 minute of no UART activity
+  if (millis() - lastUartRx >= IDLE_TIMEOUT_MS) {
+    M5.Display.clear();
+    M5.Display.setCursor(0, 0);
+    M5.Display.print("No UART — powering off");
+    M5.delay(1000);
+    M5.Power.powerOff();
   }
 
   M5.delay(1);
