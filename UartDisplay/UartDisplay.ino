@@ -135,9 +135,11 @@ void loop(void)
     lastUartRx = millis();
     char c = Serial2.read();
     Serial.print(c); // echo to USB serial for debug
-    if (c == '\n') {
-      addCompleteLine(currentLine);
-      currentLine = "";
+    if (c == '\n' || c == '\r') {
+      if (currentLine.length() > 0) {
+        addCompleteLine(currentLine);
+        currentLine = "";
+      }
       dirty = true;
     } else if (c >= ' ' && c <= '~') {
       // Filter only printable ASCII characters (0x20–0x7E)
