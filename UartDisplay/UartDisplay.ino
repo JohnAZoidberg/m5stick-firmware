@@ -1,7 +1,7 @@
 #include <M5Unified.h>
 
 static M5Canvas canvas(&M5.Display);
-static uint8_t currentRotation = 3;
+static uint8_t currentRotation = 1;
 static unsigned long lastImuCheck = 0;
 static unsigned long lastUartRx = 0;
 static const unsigned long IDLE_TIMEOUT_MS = 60000;
