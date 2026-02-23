@@ -107,17 +107,50 @@ static String cleanLine(const String& line)
   return clean;
 }
 
+// Check if character is a hex digit
+static bool isHexDigit(char c)
+{
+  return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
+// Extract PORT80 value from raw line (before sanitization can damage it)
+// Returns true if found, value will be 4 or 8 hex chars
+static bool extractPort80(const String& line, String& value)
+{
+  int idx = line.indexOf("PORT80:");
+  if (idx < 0) return false;
+
+  // Skip "PORT80:" and any whitespace
+  int start = idx + 7;
+  while (start < (int)line.length() && (line[start] == ' ' || line[start] == '\t')) {
+    start++;
+  }
+
+  // Collect hex digits (expect 4 or 8)
+  String hex;
+  for (int i = start; i < (int)line.length() && isHexDigit(line[i]); i++) {
+    hex += line[i];
+    if (hex.length() >= 8) break;  // max 4 bytes = 8 hex chars
+  }
+
+  // Valid if 4 hex chars (2 bytes) or 8 hex chars (4 bytes)
+  if (hex.length() == 4 || hex.length() == 8) {
+    value = hex;
+    return true;
+  }
+  return false;
+}
+
 static void addCompleteLine(const String& line)
 {
+  // Extract PORT80 from raw line FIRST (before sanitization can damage it)
+  String port80Value;
+  if (extractPort80(line, port80Value)) {
+    lastPort80 = port80Value;
+  }
+
   String cleaned = cleanLine(line);
   if (cleaned.length() == 0) return;  // skip empty lines
-
-  // Extract PORT80 code if present
-  int idx = cleaned.indexOf("PORT80: ");
-  if (idx >= 0) {
-    lastPort80 = cleaned.substring(idx + 8);
-    lastPort80.trim();
-  }
 
   lines[lineHead] = cleaned;
   lineHead = (lineHead + 1) % MAX_LINES;
