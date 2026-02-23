@@ -137,6 +137,7 @@ void loop(void)
     Serial.print(c); // echo to USB serial for debug
     if (c == '\n' || c == '\r') {
       if (currentLine.length() > 0) {
+        currentLine.replace("ec:~> ", "");
         addCompleteLine(currentLine);
         currentLine = "";
       }
