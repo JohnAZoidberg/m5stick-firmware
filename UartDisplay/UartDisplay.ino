@@ -100,8 +100,8 @@ void setup(void)
   M5.BtnPWR.setHoldThresh(1024);
   Serial.begin(115200);
 
-  // HAT UART: RX=G26, TX=G0
-  Serial2.begin(115200, SERIAL_8N1, 26, 0);
+  // HAT UART: RX=G26, TX=G0 (4 KiB RX buffer to avoid drops during rendering)
+  Serial2.begin(115200, SERIAL_8N1, 26, 0, false, 4096);
 
   M5.Display.setRotation(currentRotation);
 
